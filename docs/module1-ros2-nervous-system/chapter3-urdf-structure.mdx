@@ -1,0 +1,99 @@
+---
+sidebar_position: 3
+---
+
+# Chapter 3: Humanoid Structure with URDF
+
+## Introduction: Describing a Robot's Body
+
+Just as our brain needs a map of our body to control our movements, a robot's control system needs a precise description of its physical structure. This is where **URDF (Unified Robot Description Format)** comes in. URDF is an XML-based file format used in ROS 2 (and its predecessor ROS) to describe all aspects of a robot's physical and kinematic properties.
+
+URDF allows you to define:
+*   The robot's visual appearance.
+*   Its collision properties.
+*   Its inertial properties.
+*   Crucially, its kinematic structure, including how its parts are connected and how they can move.
+
+This standardized description enables various ROS 2 tools and algorithms to understand and interact with the robot, from motion planning and simulation to visualization and control.
+
+## Core URDF Elements
+
+A URDF file primarily consists of two core elements: **links** and **joints**.
+
+### Links
+
+A **link** represents a rigid body part of the robot. Think of it as a segment of the robot's structure, like a forearm, a wheel, or the main chassis. Each link has properties that describe its physical characteristics:
+*   **Visual**: How the link looks (e.g., its geometry, color, texture).
+*   **Collision**: The shape used for collision detection.
+*   **Inertial**: Its mass, center of mass, and moments of inertia, which are crucial for physics simulations.
+
+**Example of a Link Definition**:
+```xml
+<link name="base_link">
+  <visual>
+    <geometry>
+      <box size="0.6 0.4 0.2"/>
+    </geometry>
+    <material name="blue">
+      <color rgba="0 0 0.8 1"/>
+    </material>
+  </visual>
+  <collision>
+    <geometry>
+      <box size="0.6 0.4 0.2"/>
+    </geometry>
+  </collision>
+  <inertial>
+    <mass value="10"/>
+    <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
+  </inertial>
+</link>
+```
+In this example, `base_link` describes a rectangular body with specific visual, collision, and inertial properties.
+
+### Joints
+
+A **joint** defines the connection between two links and specifies their relative motion. Joints are what allow a robot's parts to articulate. Each joint connects a `parent` link to a `child` link.
+
+Key attributes of a joint include:
+*   **Type**: Defines the kind of motion allowed (e.g., `revolute` for rotation around an axis, `prismatic` for linear sliding, `fixed` for no relative motion).
+*   **Axis**: For revolute and prismatic joints, this specifies the axis of motion.
+*   **Origin**: Defines the pose (position and orientation) of the child link relative to the parent link.
+*   **Limit**: For revolute and prismatic joints, this defines the range of motion.
+
+**Example of a Joint Definition**:
+```xml
+<joint name="left_wheel_joint" type="continuous">
+  <parent link="base_link"/>
+  <child link="left_wheel_link"/>
+  <origin xyz="0.2 0.2 -0.1" rpy="0 0 0"/>
+  <axis xyz="0 1 0"/>
+</joint>
+```
+This `continuous` joint connects `base_link` to `left_wheel_link`, allowing the wheel to rotate continuously around the Y-axis relative to the base.
+
+### Frames: The Coordinate Systems
+
+While not a direct URDF element, understanding **frames** is crucial when working with URDF. Every link implicitly defines its own coordinate frame. Joints then specify the transformation between the parent link's frame and the child link's frame.
+
+These frames form a kinematic tree (or sometimes a kinematic chain). By knowing the transformations between all connected frames, you can determine the precise position and orientation of any part of the robot relative to any other part, or relative to a global reference frame. This is fundamental for tasks like:
+*   **Forward Kinematics**: Calculating the end-effector's pose given all joint angles.
+*   **Inverse Kinematics**: Calculating the joint angles required to reach a desired end-effector pose.
+*   **Collision Checking**: Determining if any robot parts are overlapping with obstacles or other robot parts.
+
+## Mapping Robot Structure to Control Logic
+
+The URDF serves as the definitive source for the robot's physical truth. AI agents and control algorithms don't directly manipulate the URDF, but they heavily rely on the information it provides.
+
+*   **Joint Control**: When an AI agent wants to move a robot arm, it sends commands to specific joints (e.g., "move `joint_1` to 30 degrees"). The control system uses the URDF's joint definitions to understand the physical limits and dynamics of that joint.
+*   **End-Effector Posing**: For tasks requiring precise placement (e.g., grasping an object), the AI agent often specifies a desired pose for the robot's end-effector (e.g., a gripper). The robot's motion planner uses the kinematic model derived from the URDF to calculate the necessary joint trajectories to achieve that pose.
+*   **Sensor Integration**: If a sensor is mounted on a specific link (e.g., a camera on the head link), the URDF helps the system understand the sensor's position and orientation relative to the rest of the robot, allowing accurate interpretation of sensor data in the robot's coordinate system.
+
+## Summary
+
+In this chapter, we explored URDF as the standard for describing a robot's physical structure within the ROS 2 ecosystem. We learned about:
+*   **Links**: The rigid body parts of a robot.
+*   **Joints**: The connections between links, defining their relative motion.
+*   **Frames**: The coordinate systems associated with each link and joint, forming the kinematic model.
+
+Understanding URDF is essential for anyone developing control algorithms or AI agents for robots, as it provides the geometric and kinematic context necessary for perception, planning, and action. This concludes our first module on ROS 2 fundamentals and its bridging to AI agents.

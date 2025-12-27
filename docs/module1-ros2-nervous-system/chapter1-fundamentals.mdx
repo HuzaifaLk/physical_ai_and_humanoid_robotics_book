@@ -1,0 +1,62 @@
+---
+sidebar_position: 1
+---
+
+# Chapter 1: ROS 2 Fundamentals
+
+## Introduction: The Robotic Nervous System
+
+The Robotic Operating System (ROS) is a flexible framework for writing robot software. It's a collection of tools, libraries, and conventions that aim to simplify the task of creating complex and robust robot behavior across a wide variety of robotic platforms. ROS 2 is the latest iteration, re-architected for modern demands like real-time control, multi-robot systems, and embedded platforms.
+
+Think of ROS 2 as the **nervous system** of a robot. Just as a biological nervous system connects various sensors, effectors, and processing units in an organism, ROS 2 provides the communication backbone that allows different software components (the "neurons") within a robot to talk to each other, process information, and coordinate actions. This distributed architecture is crucial for building scalable and modular robotic applications.
+
+## Core Concepts
+
+ROS 2 organizes robot software into several fundamental concepts:
+
+### Nodes
+
+At the heart of ROS 2's distributed architecture are **Nodes**. A node is essentially an executable process that performs a specific task. For example, a robot might have separate nodes for:
+*   Reading data from a lidar sensor.
+*   Controlling a motor.
+*   Performing complex path planning.
+*   Processing camera images to detect objects.
+
+Nodes are designed to be modular and independent. They can be written in different programming languages (e.g., Python, C++) and can run on different machines, communicating seamlessly over the ROS 2 network.
+
+### Topics: The Publish/Subscribe Communication Model
+
+Nodes communicate with each other primarily through **Topics**. A topic is a named bus over which nodes exchange messages. This communication happens using a **publish/subscribe (pub/sub)** model:
+
+*   **Publisher**: A node that sends (publishes) messages to a specific topic.
+*   **Subscriber**: A node that listens (subscribes) to a specific topic to receive messages.
+
+This model is asynchronous and decoupled:
+*   Publishers don't know (or care) which subscribers are listening, and vice-versa.
+*   Messages are broadcast, and any node interested in that data can subscribe.
+*   This allows for great flexibility; you can add or remove nodes from the system without reconfiguring the entire communication network.
+
+**Example**: A "Camera Node" might publish image data to a topic named `/camera/image_raw`. A "Object Detection Node" would then subscribe to `/camera/image_raw` to receive these images and process them. A "Display Node" could also subscribe to the same topic to show a live camera feed.
+
+### Services: The Request/Response Communication Model
+
+While topics are excellent for continuous, one-way data streams, sometimes nodes need to make a specific request and receive a direct response. For this, ROS 2 provides **Services**.
+
+Services implement a **request/response** communication model:
+*   **Service Server**: A node that offers a service (e.g., "AddTwoInts"). It waits for requests, performs computation, and sends back a response.
+*   **Service Client**: A node that sends a request to a service server and waits for the response.
+
+This model is synchronous and coupled:
+*   The client blocks until it receives a response (or a timeout occurs).
+*   Services are typically used for infrequent, one-off operations that require a direct result.
+
+**Example**: A "Robot Arm Node" might offer a service named `/move_arm_to_position`. An "AI Planning Node" could then act as a client, sending a request to this service with desired joint angles and waiting for confirmation that the arm has moved.
+
+## Summary
+
+In this chapter, we introduced ROS 2 as the distributed nervous system for robots, enabling modular software components (nodes) to communicate effectively. We explored the core communication primitives:
+*   **Nodes**: Independent computational units.
+*   **Topics**: For asynchronous, one-way data streaming using a publish/subscribe model.
+*   **Services**: For synchronous, request/response interactions.
+
+Understanding these fundamentals is crucial for building any application within the ROS 2 ecosystem. In the next chapter, we will dive into implementing these concepts using Python.

@@ -1,0 +1,151 @@
+---
+sidebar_position: 2
+---
+
+# Chapter 2: Cognitive Planning with LLMs
+
+## Introduction: From Simple Commands to Complex Plans
+
+In the previous chapter, we built a pipeline to translate a simple, direct command like "move forward" into a single robot action. But what if the command is more complex, like "go to the kitchen and get me a soda"? A simple keyword parser can't handle this. This type of high-level, multi-step instruction requires a form of "common-sense" reasoning and planning. This is where **Large Language Models (LLMs)** come in.
+
+An LLM, such as those from the GPT family, can act as the "cognitive brain" of our robot. By leveraging its vast knowledge, we can use an LLM to take a high-level natural language command and break it down into a structured sequence of executable actions that our robot's ROS 2 system can understand. This is the essence of **cognitive planning**.
+
+## Natural Language to Task Plans
+
+The core idea is to treat the LLM as a planning service. A ROS 2 node, let's call it the `CognitivePlannerNode`, will be responsible for this.
+
+The workflow looks like this:
+1.  The `CognitivePlannerNode` receives a high-level goal, perhaps from the `/voice_command_text` topic we created in the last chapter.
+2.  It constructs a carefully designed **prompt** to send to an LLM API (like the OpenAI API).
+3.  The LLM processes the prompt and returns a structured plan.
+4.  The `CognitivePlannerNode` parses this plan and begins executing the actions in sequence.
+
+### Designing the Prompt
+
+The key to getting a useful plan from an LLM is **prompt engineering**. The prompt must give the LLM enough context to understand the robot's capabilities and the desired output format.
+
+A good prompt for a robotic task planner might include:
+*   **A role**: "You are a helpful AI assistant for a household robot."
+*   **The goal**: The natural language command from the user (e.g., "go to the kitchen and get me a soda").
+*   **A list of available actions**: A description of the ROS 2 actions the robot can perform (e.g., `navigate_to(waypoint)`, `find_object(object_name)`, `grasp_object(object_id)`).
+*   **Output format instructions**: A request for the output to be in a machine-readable format, like JSON.
+
+**Example Prompt:**
+```text
+You are a helpful AI assistant for a household robot. Your task is to take a user's command and convert it into a structured plan.
+
+The robot has the following available actions:
+- navigate_to(waypoint): moves the robot to a named location (e.g., "kitchen", "living_room").
+- find_object(object_name): looks for a specific object in the current vicinity.
+- grasp_object(object_id): picks up the specified object.
+
+User command: "go to the kitchen and get me a soda"
+
+Please provide a plan as a JSON array of objects, where each object has an "action" and a "parameter".
+```
+
+### Parsing the LLM's Output
+
+Given the prompt above, the LLM might return a JSON response like this:
+```json
+[
+  {
+    "action": "navigate_to",
+    "parameter": "kitchen"
+  },
+  {
+    "action": "find_object",
+    "parameter": "soda"
+  },
+  {
+    "action": "grasp_object",
+    "parameter": "soda_1" 
+  }
+]
+```
+*(Note: The LLM might need to infer an object ID like "soda_1" from the output of the `find_object` action, which adds another layer to the system's complexity.)*
+
+The `CognitivePlannerNode` would then parse this JSON array. It now has a structured **task plan** that it can execute step-by-step.
+
+## Sequencing ROS 2 Actions
+
+Once the plan is parsed, the planner node needs to execute it. Since each step might be a long-running ROS 2 action, the planner must call each action, wait for it to complete successfully, and then move on to the next one.
+
+**Conceptual Python Node Snippet:**
+```python
+# (Conceptual code, not a complete running example)
+class CognitivePlannerNode(Node):
+    def __init__(self):
+        super().__init__('cognitive_planner_node')
+        # ... subscription to command topic ...
+        # ... action clients for navigate_to, find_object, grasp_object ...
+
+    def command_callback(self, msg):
+        command_text = msg.data
+        prompt = self.create_llm_prompt(command_text)
+        plan_json = self.call_llm_api(prompt)
+        task_plan = self.parse_plan(plan_json)
+        self.execute_plan(task_plan)
+
+    def execute_plan(self, plan):
+        for task in plan:
+            self.get_logger().info(f"Executing task: {task['action']} with param: {task['parameter']}")
+            
+            # This is a simplified execution loop
+            if task['action'] == 'navigate_to':
+                # Call the navigate_to action and wait for completion
+                future = self.nav_action_client.send_goal_async(...)
+                # rclpy.spin_until_future_complete(...)
+                result = future.result()
+                if not result.success:
+                    self.get_logger().error('Navigation failed!')
+                    self.handle_error(plan, current_task=task)
+                    return # Stop the plan
+            
+            # ... elif for other actions ...
+        
+        self.get_logger().info('Plan executed successfully!')
+```
+
+## Error Handling and Replanning
+
+What happens if a step in the plan fails? For example, the `navigate_to` action fails because the path is blocked, or the `find_object` action fails because there is no soda in the kitchen.
+
+A robust cognitive planner must include **error handling**. When a step fails, the planner can:
+1.  **Stop**: Abort the plan and report the failure to the user.
+2.  **Retry**: Attempt the failed action again a few times.
+3.  **Replan**: This is the most intelligent option. The planner can call the LLM again with a new prompt that includes the context of the failure.
+
+**Example Replanning Prompt:**
+```text
+... (same initial context) ...
+
+User command: "go to the kitchen and get me a soda"
+
+The robot attempted the following plan but failed:
+1. navigate_to("kitchen") -> SUCCESS
+2. find_object("soda") -> FAIL: Object "soda" not found.
+
+Please provide a new plan to achieve the original goal. You can use the 'say(text)' action to communicate with the user.
+```
+
+The LLM might then generate a new plan:
+```json
+[
+  {
+    "action": "say",
+    "parameter": "I could not find a soda in the kitchen. Is there somewhere else I should look?"
+  }
+]
+```
+This ability to reason about failure and generate alternative plans is what makes LLM-based planners so powerful and flexible.
+
+## Summary
+
+This chapter explored how to use Large Language Models (LLMs) to add a layer of cognitive planning to our robot. We learned how to:
+*   Use **prompt engineering** to make an LLM act as a task planner.
+*   Convert a high-level natural language command into a structured, machine-readable **task plan**.
+*   Write a ROS 2 node that can **sequence** the execution of the plan's actions.
+*   Consider strategies for **error handling and replanning** when things go wrong.
+
+In the final capstone chapter, we will see how this cognitive planning system integrates with the perception and navigation stacks from the previous modules to create a truly autonomous humanoid robot.

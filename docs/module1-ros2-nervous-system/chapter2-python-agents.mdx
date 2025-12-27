@@ -1,0 +1,223 @@
+---
+sidebar_position: 2
+---
+
+# Chapter 2: Python Agents with rclpy
+
+## Introduction to rclpy
+
+In Chapter 1, we learned about the fundamental concepts of ROS 2: nodes, topics, and services. Now, we'll dive into implementing these concepts using Python, specifically with the `rclpy` client library.
+
+`rclpy` is the official Python client library for ROS 2. It provides an idiomatic Python interface to the core ROS 2 functionalities, allowing you to easily create ROS 2 nodes and interact with the ROS 2 graph using Python. This is particularly useful for AI agents, as many AI algorithms are developed in Python.
+
+## Creating a ROS 2 Node in Python
+
+Every ROS 2 application starts with one or more nodes. Here's a basic structure for a Python node using `rclpy`:
+
+```python
+import rclpy
+from rclpy.node import Node
+
+class MinimalNode(Node):
+    def __init__(self):
+        super().__init__('minimal_node') # Initialize the node with a unique name
+        self.get_logger().info('Minimal Node has been started!')
+
+def main(args=None):
+    rclpy.init(args=args)         # Initialize rclpy
+    minimal_node = MinimalNode()  # Create an instance of our node
+    rclpy.spin(minimal_node)      # Keep the node alive and processing events
+    minimal_node.destroy_node()   # Destroy the node when done
+    rclpy.shutdown()              # Shut down rclpy
+
+if __name__ == '__main__':
+    main()
+```
+*   `rclpy.init(args=args)`: Initializes the ROS 2 Python client library. This must be called before you can create any ROS 2 nodes.
+*   `Node('minimal_node')`: Creates an instance of a `Node` with the name `'minimal_node'`. Node names must be unique within a ROS 2 domain.
+*   `rclpy.spin(minimal_node)`: This call blocks the program and keeps the node alive, allowing it to process callbacks (e.g., from subscribers or timers).
+*   `minimal_node.destroy_node()`: Cleans up the node.
+*   `rclpy.shutdown()`: Shuts down the `rclpy` library.
+
+## Publishers and Subscribers in Python
+
+Let's implement the talker-listener example from Chapter 1 using `rclpy`.
+
+### Python Publisher (Talker)
+
+This node will publish string messages to a topic named `/topic`.
+
+```python
+import rclpy
+from rclpy.node import Node
+from std_msgs.msg import String # Standard ROS 2 message type for strings
+
+class MinimalPublisher(Node):
+    def __init__(self):
+        super().__init__('minimal_publisher')
+        self.publisher_ = self.create_publisher(String, 'topic', 10) # Topic name: 'topic', QoS profile: 10
+        timer_period = 0.5  # seconds
+        self.timer = self.create_timer(timer_period, self.timer_callback)
+        self.i = 0
+
+    def timer_callback(self):
+        msg = String()
+        msg.data = f'Hello ROS 2! Count: {self.i}'
+        self.publisher_.publish(msg)
+        self.get_logger().info(f'Publishing: "{msg.data}"')
+        self.i += 1
+
+def main(args=None):
+    rclpy.init(args=args)
+    minimal_publisher = MinimalPublisher()
+    rclpy.spin(minimal_publisher)
+    minimal_publisher.destroy_node()
+    rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+```
+*   `create_publisher(String, 'topic', 10)`: Creates a publisher that will send `String` messages on the topic `'topic'` with a QoS (Quality of Service) history depth of 10.
+*   `create_timer(timer_period, self.timer_callback)`: Sets up a timer that calls `self.timer_callback` every `timer_period` seconds.
+
+### Python Subscriber (Listener)
+
+This node will subscribe to the `/topic` and print the messages it receives.
+
+```python
+import rclpy
+from rclpy.node import Node
+from std_msgs.msg import String
+
+class MinimalSubscriber(Node):
+    def __init__(self):
+        super().__init__('minimal_subscriber')
+        self.subscription = self.create_subscription(
+            String,
+            'topic',
+            self.listener_callback,
+            10) # Topic name: 'topic', QoS profile: 10
+        self.subscription  # prevent unused variable warning
+
+    def listener_callback(self, msg):
+        self.get_logger().info(f'I heard: "{msg.data}"')
+
+def main(args=None):
+    rclpy.init(args=args)
+    minimal_subscriber = MinimalSubscriber()
+    rclpy.spin(minimal_subscriber)
+    minimal_subscriber.destroy_node()
+    rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+```
+*   `create_subscription(String, 'topic', self.listener_callback, 10)`: Creates a subscriber that listens for `String` messages on the topic `'topic'`. When a message is received, `self.listener_callback` is executed.
+
+To run these examples:
+1.  Save the publisher code as `talker.py` and the subscriber code as `listener.py`.
+2.  Open two separate terminals.
+3.  In the first terminal, navigate to the directory containing your `talker.py` and run: `python3 talker.py`
+4.  In the second terminal, navigate to the directory containing your `listener.py` and run: `python3 listener.py`
+You should see messages being published by the talker and received by the listener.
+
+## Services in Python
+
+Now let's implement a simple service example. A service that adds two integers.
+
+### Python Service Server
+
+```python
+import rclpy
+from rclpy.node import Node
+from example_interfaces.srv import AddTwoInts # Custom service message type
+
+class MinimalService(Node):
+    def __init__(self):
+        super().__init__('minimal_service')
+        self.srv = self.create_service(AddTwoInts, 'add_two_ints', self.add_two_ints_callback)
+
+    def add_two_ints_callback(self, request, response):
+        response.sum = request.a + request.b
+        self.get_logger().info(f'Incoming request: a={request.a} b={request.b}, sending back sum={response.sum}')
+        return response
+
+def main(args=None):
+    rclpy.init(args=args)
+    minimal_service = MinimalService()
+    rclpy.spin(minimal_service)
+    minimal_service.destroy_node()
+    rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+```
+*   `create_service(AddTwoInts, 'add_two_ints', self.add_two_ints_callback)`: Creates a service named `'add_two_ints'` that expects `AddTwoInts` messages. When a request comes in, `self.add_two_ints_callback` is called.
+
+### Python Service Client
+
+```python
+import sys
+import rclpy
+from rclpy.node import Node
+from example_interfaces.srv import AddTwoInts
+
+class MinimalClientAsync(Node):
+    def __init__(self):
+        super().__init__('minimal_client_async')
+        self.cli = self.create_client(AddTwoInts, 'add_two_ints')
+        while not self.cli.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('service not available, waiting again...')
+        self.req = AddTwoInts.Request()
+
+    def send_request(self, a, b):
+        self.req.a = a
+        self.req.b = b
+        self.future = self.cli.call_async(self.req)
+        rclpy.spin_until_future_complete(self, self.future) # Wait for the response
+        return self.future.result()
+
+def main(args=None):
+    rclpy.init(args=args)
+    minimal_client = MinimalClientAsync()
+    response = minimal_client.send_request(int(sys.argv[1]), int(sys.argv[2]))
+    minimal_client.get_logger().info(
+        f'Result of add_two_ints: for {sys.argv[1]} + {sys.argv[2]} = {response.sum}')
+    minimal_client.destroy_node()
+    rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+```
+*   `create_client(AddTwoInts, 'add_two_ints')`: Creates a client for the `'add_two_ints'` service.
+*   `wait_for_service()`: The client waits until the service server is available.
+*   `call_async(self.req)`: Sends the request asynchronously.
+*   `rclpy.spin_until_future_complete(self, self.future)`: Blocks until the service response is received.
+
+To run these examples:
+1.  Save the service code as `service.py` and the client code as `client.py`.
+2.  Open two separate terminals.
+3.  In the first terminal, navigate to the directory containing your `service.py` and run: `python3 service.py`
+4.  In the second terminal, navigate to the directory containing your `client.py` and run: `python3 client.py 2 3` (where 2 and 3 are the integers to add).
+You should see the service processing the request and the client receiving the sum.
+
+## AI Agent to Controller Communication Flow
+
+Imagine an AI agent written in Python that needs to control a robot. `rclpy` provides the bridge:
+*   **Perception (Sensors to AI)**: Sensor nodes (e.g., camera, lidar) publish data to ROS 2 topics. The AI agent (a `rclpy` node) subscribes to these topics to receive the raw or processed sensor data.
+*   **Decision Making (AI Processing)**: The AI agent processes this data using its internal logic (e.g., object detection, path planning, reinforcement learning).
+*   **Action (AI to Controller)**: Based on its decisions, the AI agent needs to send commands to the robot's actuators. This can happen in a few ways:
+    *   **Topics**: For continuous control commands (e.g., publishing desired velocities to a `/cmd_vel` topic).
+    *   **Services**: For discrete, one-off commands that require confirmation (e.g., calling a `/gripper/open` service or `/move_to_waypoint` service).
+
+This robust communication framework allows complex AI algorithms to be developed independently and then integrated seamlessly into the robot's control system through ROS 2 nodes, topics, and services.
+
+## Summary
+
+This chapter provided a hands-on introduction to `rclpy`, the Python client library for ROS 2. We learned how to:
+*   Create basic ROS 2 nodes.
+*   Implement publishers and subscribers for asynchronous topic communication.
+*   Implement service servers and clients for synchronous request/response interactions.
+*   Understand the typical communication flow between a Python-based AI agent and a robot controller via ROS 2.
+
+With this knowledge, you are now equipped to start building your own Python-based ROS 2 applications for robotic control. In the next chapter, we will explore how robots' physical structures are described using URDF.
