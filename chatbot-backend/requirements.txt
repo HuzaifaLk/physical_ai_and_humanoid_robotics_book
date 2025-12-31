@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+cohere
+openai
+qdrant-client
+python-dotenv
