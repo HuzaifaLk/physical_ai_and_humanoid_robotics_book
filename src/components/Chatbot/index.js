@@ -17,7 +17,7 @@ export default function Chatbot() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('https://huzaifalk123-chatbot.hf.space/qa/', {
+      const response = await fetch('https://huggingface.co/spaces/huzaifalk123/backend/qa/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
